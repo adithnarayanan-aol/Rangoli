@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create Your Rangoli</title>
+
+  <style>
+    :root {
+      --ink: #16324f;
+      --muted: #5f7388;
+      --line: #d7e6f5;
+      --primary: #1468b3;
+      --blue-deep: #124f86;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: radial-gradient(ellipse at 50% 0%, #fff 0, #f7fbff 42%, #edf6ff 100%);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    nav {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 7vw;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, .82);
+      font-size: 13px;
+    }
+
+    nav a { color: inherit; text-decoration: none; }
+
+    .brand {
+      color: var(--blue-deep);
+      font-weight: 650;
+      letter-spacing: -.3px;
+    }
+
+    main {
+      max-width: 1120px;
+      margin: auto;
+      padding: 60px 24px 72px;
+      text-align: center;
+    }
+
+    .eyebrow {
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 12px 0 10px;
+      color: var(--blue-deep);
+      font-size: clamp(42px, 7vw, 76px);
+      line-height: 1.02;
+      letter-spacing: -.065em;
+      font-weight: 650;
+    }
+
+    .intro {
+      max-width: 540px;
+      margin: 0 auto;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.5;
+    }
+
+    /* The shadow lives on a static pseudo-element instead of a CSS filter on
+       the SVG, so drawing on the rangoli doesn't re-rasterise a blur on every
+       pointer move (a big cost on phones). */
+    .artwork {
+      position: relative;
+      width: min(470px, 88vw);
+      margin: 32px auto 18px;
+    }
+
+    .artwork::before {
+      content: "";
+      position: absolute;
+      inset: 2.4%;
+      border-radius: 50%;
+      box-shadow: 0 18px 30px rgba(31, 91, 140, .14);
+    }
+
+    .artwork svg {
+      position: relative;
+      display: block;
+      width: 100%;
+    }
+
+    #rangoli.is-drawing {
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .controls,
+    .customizers {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .controls { margin: 20px 0 26px; }
+
+    button {
+      border: 1px solid var(--primary);
+      border-radius: 999px;
+      padding: 12px 20px;
+      background: var(--primary);
+      color: #fff;
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: transform .18s, background .18s, opacity .18s;
+    }
+
+    @media (hover: hover) {
+      button:hover:not(:disabled) {
+        transform: translateY(-2px);
+        background: var(--blue-deep);
+      }
+      button.secondary:hover:not(:disabled) { background: #eaf5ff; }
+    }
+
+    button:focus-visible {
+      outline: 3px solid #45a9d8;
+      outline-offset: 2px;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .45;
+    }
+
+    button.secondary {
+      border-color: #b9d3e9;
+      background: #fff;
+      color: var(--blue-deep);
+    }
+
+    .customizers {
+      gap: 10px 18px;
+      max-width: 760px;
+      margin: 0 auto 22px;
+    }
+
+    .control-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    input[type="color"] {
+      width: 34px;
+      height: 34px;
+      padding: 3px;
+      border: 1px solid #c5d9eb;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    input[type="range"] {
+      width: 110px;
+      accent-color: var(--primary);
+    }
+
+    select,
+    input[type="file"]::file-selector-button {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 9px 12px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      font-size: 13px;
+    }
+
+    .upload-card {
+      max-width: 690px;
+      margin: 14px auto;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, .9);
+      box-shadow: 0 12px 32px rgba(41, 94, 138, .06);
+      text-align: left;
+    }
+
+    .upload-card h2 { margin: 0 0 6px; font-size: 17px; }
+
+    .upload-card p {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .upload-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    input[type="file"] {
+      max-width: 100%;
+      color: var(--muted);
+      font: inherit;
+      font-size: 13px;
+    }
+
+    .status {
+      min-height: 20px;
+      margin: 10px 0 0 !important;
+      font-size: 13px !important;
+    }
+
+    /* Shown only while an AR session is running (WebXR DOM overlay). */
+    #arOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+      background: transparent;
+      pointer-events: none;
+    }
+
+    #arOverlay button { pointer-events: auto; }
+
+    #arHud {
+      margin: 0;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, .6);
+      color: #fff;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    footer {
+      padding: 22px 7vw;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 540px) {
+      main { padding-top: 44px; }
+      .intro { font-size: 16px; }
+      .upload-card { padding: 18px; }
+      .upload-row { align-items: flex-start; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      button { transition: none; }
+    }
+  </style>
+</head>
+
+<body>
+  <nav aria-label="Main navigation">
+    <a class="brand" href="#">Rangoli Studio</a>
+    <a href="#design">Create</a>
+  </nav>
+
+  <main id="design">
+    <div class="eyebrow">A little colour. A lot of creativity.</div>
+    <h1>Display your<br>creativity.</h1>
+    <p class="intro">
+      Explore colour, pattern and symmetry. Add a picture, draw on your
+      rangoli, download your design, or place it in your space with AR.
+    </p>
+
+    <div class="artwork">
+      <svg id="rangoli" xmlns="http://www.w3.org/2000/svg"
+           viewBox="0 0 500 500" role="img"
+           aria-label="A colourful, symmetrical rangoli design">
+        <circle cx="250" cy="250" r="238" fill="#fffdf8"/>
+        <g id="pattern" transform="translate(250 250)"></g>
+        <circle id="centerDisc" cx="250" cy="250" r="39" fill="#fffdf8"/>
+        <image id="centerLogo" x="223" y="223" width="54" height="54"
+               preserveAspectRatio="xMidYMid meet" style="display:none"/>
+        <g id="freehandLayer"
+           fill="none"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           pointer-events="none"></g>
+      </svg>
+    </div>
+
+    <div class="customizers">
+      <label class="control-group">
+        Color 1
+        <input id="primaryColor" type="color" value="#e84f5b">
+      </label>
+
+      <label class="control-group">
+        Color 2
+        <input id="accentColor" type="color" value="#f4b942">
+      </label>
+
+      <label class="control-group">
+        Color 3
+        <input id="thirdColor" type="color" value="#3478b8">
+      </label>
+
+      <label class="control-group" for="patternStyle">
+        Pattern
+        <select id="patternStyle">
+          <option value="lotus">Lotus</option>
+          <option value="petal">Petal flower</option>
+          <option value="star">Star</option>
+          <option value="geometric">Geometric</option>
+          <option value="canvas">Canvas</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="controls">
+      <button type="button" id="shuffleButton">Try a colour mix</button>
+      <button type="button" class="secondary" id="downloadButton">Download SVG</button>
+      <button type="button" class="secondary" id="drawToggle" aria-pressed="false">Draw on rangoli</button>
+
+      <label class="control-group">
+        Drawing colour
+        <input id="drawColor" type="color" value="#29231f">
+      </label>
+
+      <label class="control-group">
+        Brush size
+        <input id="drawWidth" type="range" min="2" max="20" value="6">
+      </label>
+
+      <button type="button" class="secondary" id="undoDrawing">Undo stroke</button>
+      <button type="button" class="secondary" id="clearDrawing">Clear drawing</button>
+    </div>
+
+    <section class="upload-card" aria-labelledby="logoHeading">
+      <h2 id="logoHeading">Drop a picture!</h2>
+      <p>Choose an SVG, JPEG, HEIC, or other picture for the centre of your rangoli.</p>
+      <div class="upload-row">
+        <input id="logoInput" type="file" accept="image/*,.svg,.heic,.heif,image/heic,image/heif">
+        <button type="button" class="secondary" id="removeLogoButton">Remove picture</button>
+      </div>
+      <p id="logoStatus" class="status" aria-live="polite"></p>
+    </section>
+
+    <section id="arCard" class="upload-card" aria-labelledby="arHeading">
+      <h2 id="arHeading">View your rangoli in AR</h2>
+      <p>
+        Start AR, point your phone at the floor or a table, and tap to place
+        the current rangoli design. Colour, pattern, centre picture, and
+        drawing changes are included.
+      </p>
+      <div class="upload-row">
+        <button type="button" id="arStart" disabled>Start AR</button>
+      </div>
+      <p id="arStatus" class="status" aria-live="polite">Checking AR support…</p>
+    </section>
+  </main>
+
+  <footer>Rangoli Studio · A small creative project</footer>
+
+  <!-- DOM overlay: the only page UI visible while the AR camera is running -->
+  <div id="arOverlay">
+    <p id="arHud"></p>
+    <button type="button" class="secondary" id="arExit">Exit AR</button>
+  </div>
+
+  <!-- Plain script: no top-level dependency on three.js, so the editor works
+       even if the CDN is slow, blocked, or the browser lacks import maps. -->
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector);
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    const VIEW = 500; // rangoli viewBox size
+    const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js";
+
+    /* ------------------------------------------------------------------ *
+     * Editor
+     * ------------------------------------------------------------------ */
+    const rangoliSvg = $("#rangoli");
+    const patternGroup = $("#pattern");
+    const freehandLayer = $("#freehandLayer");
+    const pickers = [$("#primaryColor"), $("#accentColor"), $("#thirdColor")];
+    const patternPicker = $("#patternStyle");
+    const centerDisc = $("#centerDisc");
+    const centerLogo = $("#centerLogo");
+    const drawToggle = $("#drawToggle");
+    const drawColor = $("#drawColor");
+    const drawWidth = $("#drawWidth");
+    const logoInput = $("#logoInput");
+    const logoStatus = $("#logoStatus");
+
+    const PALETTES = [
+      ["#e84f5b", "#f4b942", "#3478b8"],
+      ["#df6c32", "#426b8b", "#f2d16b"],
+      ["#a43e65", "#69a28d", "#f1c75b"],
+      ["#4e5d9b", "#e5a84b", "#4c9b91"],
+      ["#cf5a42", "#7b5ca7", "#e2c35b"]
+    ];
+
+    const DESIGNS = {
+      lotus:     { count: 16, inner: 10, path: "M0 0C-28 -38 -38 -97 0 -169C38 -97 28 -38 0 0Z" },
+      petal:     { count: 12, inner: 10, path: "M0 0C-54 -37 -48 -119 0 -156C48 -119 54 -37 0 0Z" },
+      star:      { count: 12, inner: 10, path: "M0 0L-26 -63L0 -169L26 -63Z" },
+      geometric: { count: 10, inner: 8,  path: "M0 0L-34 -34L0 -164L34 -34Z" }
+    };
+
+    const INNER_PETAL = "M0 0C-18 -20 -25 -54 0 -91C25 -54 18 -20 0 0Z";
+    const WHITE_STROKE = 'stroke="#fff" stroke-width="4"';
+
+    // The ring of 32 dots never changes, so compute its coordinates once.
+    const DOTS = Array.from({ length: 32 }, (_, i) => {
+      const angle = (i * Math.PI) / 16;
+      return [(Math.cos(angle) * 199).toFixed(2), (Math.sin(angle) * 199).toFixed(2)];
+    });
+
+    function patternMarkup(style, colors) {
+      const { count, inner, path } = DESIGNS[style];
+      let out = "";
+
+      for (let i = 0; i < count; i++) {
+        out += `<path d="${path}" transform="rotate(${(i * 360) / count})" fill="${colors[i % 3]}" ${WHITE_STROKE}/>`;
+      }
+      for (let i = 0; i < inner; i++) {
+        out += `<path d="${INNER_PETAL}" transform="rotate(${(i * 360) / inner + 18})" fill="${colors[(i + 1) % 3]}" ${WHITE_STROKE}/>`;
+      }
+      DOTS.forEach(([x, y], i) => {
+        out += `<circle cx="${x}" cy="${y}" r="5" fill="${colors[i % 3]}"/>`;
+      });
+      out += `<circle r="43" fill="${colors[2]}" stroke="#fff" stroke-width="6"/>`;
+      return out;
+    }
+
+    function drawRangoli() {
+      const style = patternPicker.value;
+      const isCanvas = style === "canvas";
+
+      centerDisc.style.display = isCanvas ? "none" : "";
+      // Colour values from <input type="color"> are always #rrggbb, so this is safe.
+      patternGroup.innerHTML = isCanvas
+        ? ""
+        : patternMarkup(style, pickers.map((picker) => picker.value));
+    }
+
+    // Colour pickers fire many `input` events per second; redraw once per frame.
+    let redrawQueued = false;
+    function queueRedraw() {
+      if (redrawQueued) return;
+      redrawQueued = true;
+      requestAnimationFrame(() => {
+        redrawQueued = false;
+        drawRangoli();
+      });
+    }
+
+    pickers.forEach((picker) => picker.addEventListener("input", queueRedraw));
+    patternPicker.addEventListener("change", drawRangoli);
+
+    $("#shuffleButton").addEventListener("click", () => {
+      const palette = PALETTES[Math.floor(Math.random() * PALETTES.length)];
+      pickers.forEach((picker, i) => { picker.value = palette[i]; });
+      drawRangoli();
+    });
+
+    /** Serialise the live SVG. Pass a size to give it a fixed pixel size (for rasterising). */
+    function serializeSvg(size) {
+      const copy = rangoliSvg.cloneNode(true);
+      copy.removeAttribute("class");
+      copy.setAttribute("xmlns", SVG_NS);
+      if (size) {
+        copy.setAttribute("width", size);
+        copy.setAttribute("height", size);
+      }
+      return new XMLSerializer().serializeToString(copy);
+    }
+
+    $("#downloadButton").addEventListener("click", () => {
+      const url = URL.createObjectURL(
+        new Blob([serializeSvg()], { type: "image/svg+xml;charset=utf-8" })
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "my-rangoli.svg";
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+
+    /* ---- Centre picture ------------------------------------------------ */
+    const LOGO_MAX = 384;
+
+    const loadImage = (src) => new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error(
+        "This browser can’t open that picture format. Try saving it as JPEG."
+      ));
+      image.src = src;
+    });
+
+    function setLogo(dataUrl) {
+      if (dataUrl) centerLogo.setAttribute("href", dataUrl);
+      else centerLogo.removeAttribute("href");
+      centerLogo.style.display = dataUrl ? "" : "none";
+    }
+
+    /**
+     * Decode the picture and re-encode it as a small PNG. Phone photos are
+     * several MB; embedding them raw makes the SVG huge, and big embedded
+     * images are a common reason SVG→canvas conversion (used for AR) fails
+     * on phones. Rasterising also neutralises any scripts inside uploaded SVGs.
+     */
+    async function fileToLogoDataUrl(file) {
+      const objectUrl = URL.createObjectURL(file);
+      try {
+        const image = await loadImage(objectUrl);
+        const isSvg = file.type === "image/svg+xml" || /\.svg$/i.test(file.name);
+        const width = image.naturalWidth || LOGO_MAX;
+        const height = image.naturalHeight || LOGO_MAX;
+        const longest = Math.max(width, height);
+        const scale = isSvg ? LOGO_MAX / longest : Math.min(1, LOGO_MAX / longest);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(width * scale));
+        canvas.height = Math.max(1, Math.round(height * scale));
+        canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL("image/png");
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    }
+
+    logoInput.addEventListener("change", async () => {
+      const file = logoInput.files?.[0];
+      if (!file) return;
+
+      logoStatus.textContent = "Processing picture…";
+      try {
+        setLogo(await fileToLogoDataUrl(file));
+        logoStatus.textContent = "Picture added to the centre.";
+      } catch (error) {
+        logoStatus.textContent = error.message || "Could not load that picture.";
+      }
+    });
+
+    $("#removeLogoButton").addEventListener("click", () => {
+      setLogo(null);
+      logoInput.value = "";
+      logoStatus.textContent = "Centre picture removed.";
+    });
+
+    /* ---- Freehand drawing ---------------------------------------------- */
+    let drawingEnabled = false;
+    let stroke = null;
+    let strokeD = "";
+    let box = null;
+    let frame = 0;
+
+    const pointFrom = (event) =>
+      `${(((event.clientX - box.left) * VIEW) / box.width).toFixed(1)} ` +
+      `${(((event.clientY - box.top) * VIEW) / box.height).toFixed(1)}`;
+
+    function endStroke() {
+      if (!stroke) return;
+      cancelAnimationFrame(frame);
+      frame = 0;
+      stroke.setAttribute("d", strokeD);
+      stroke = null;
+    }
+
+    drawToggle.addEventListener("click", () => {
+      drawingEnabled = !drawingEnabled;
+      if (!drawingEnabled) endStroke();
+      drawToggle.setAttribute("aria-pressed", String(drawingEnabled));
+      drawToggle.textContent = drawingEnabled ? "Finish drawing" : "Draw on rangoli";
+      rangoliSvg.classList.toggle("is-drawing", drawingEnabled);
+    });
+
+    rangoliSvg.addEventListener("pointerdown", (event) => {
+      if (!drawingEnabled || !event.isPrimary) return;
+
+      event.preventDefault();
+      rangoliSvg.setPointerCapture(event.pointerId);
+      box = rangoliSvg.getBoundingClientRect(); // measured once per stroke, not per move
+
+      const start = pointFrom(event);
+      strokeD = `M${start}L${start}`; // zero-length segment so a single tap leaves a dot
+
+      stroke = document.createElementNS(SVG_NS, "path");
+      stroke.setAttribute("d", strokeD);
+      stroke.setAttribute("stroke", drawColor.value);
+      stroke.setAttribute("stroke-width", drawWidth.value);
+      freehandLayer.appendChild(stroke);
+    });
+
+    rangoliSvg.addEventListener("pointermove", (event) => {
+      if (!stroke) return;
+
+      for (const sample of event.getCoalescedEvents?.() ?? [event]) {
+        strokeD += `L${pointFrom(sample)}`;
+      }
+      // Touch the DOM at most once per frame.
+      frame ||= requestAnimationFrame(() => {
+        frame = 0;
+        stroke?.setAttribute("d", strokeD);
+      });
+    });
+
+    rangoliSvg.addEventListener("pointerup", endStroke);
+    rangoliSvg.addEventListener("pointercancel", endStroke);
+
+    $("#undoDrawing").addEventListener("click", () => freehandLayer.lastElementChild?.remove());
+    $("#clearDrawing").addEventListener("click", () => freehandLayer.replaceChildren());
+
+    /* ------------------------------------------------------------------ *
+     * AR (WebXR). three.js is only downloaded, and a WebGL context only
+     * created, on devices that actually support immersive AR.
+     * ------------------------------------------------------------------ */
+    const arStart = $("#arStart");
+    const arStatus = $("#arStatus");
+    const arOverlay = $("#arOverlay");
+    const arHud = $("#arHud");
+    const arExit = $("#arExit");
+
+    const setArStatus = (message) => {
+      arStatus.textContent = message;
+      arHud.textContent = message;
+    };
+
+    const userError = (message) => Object.assign(new Error(message), { userMessage: message });
+
+    let threePromise = null;
+    const loadThree = () => (threePromise ??= import(THREE_URL).catch(() => {
+      threePromise = null; // allow a retry
+      throw userError("Couldn’t load the 3D library. Check your connection and try again.");
+    }));
+
+    /** Returns a human-readable reason AR can't run here, or null if it can. */
+    async function detectArProblem() {
+      if (!window.isSecureContext) {
+        return "AR needs a secure page (https://). This page was opened over plain http or a local file, " +
+               "so the browser blocks AR. Host it on HTTPS (e.g. GitHub Pages, Netlify) or open it via localhost.";
+      }
+      if (!navigator.xr) {
+        return "This browser doesn’t support WebXR AR. On Android use Chrome; " +
+               "Safari on iPhone/iPad doesn’t support WebXR.";
+      }
+      try {
+        if (!(await navigator.xr.isSessionSupported("immersive-ar"))) {
+          return "This device or browser doesn’t offer AR. On Android, use Chrome and make sure " +
+                 "“Google Play Services for AR” is installed and up to date.";
+        }
+      } catch {
+        return "Couldn’t check AR support in this browser.";
+      }
+      return null;
+    }
+
+    function describeArError(error) {
+      if (error?.userMessage) return error.userMessage;
+      switch (error?.name) {
+        case "NotAllowedError":
+        case "SecurityError":
+          return "AR was blocked. Allow camera access for this site, then tap Start AR again.";
+        case "NotSupportedError":
+          return "This device can’t start AR with the features needed (surface detection).";
+        default:
+          return "Couldn’t start AR on this device.";
+      }
+    }
+
+    /** Render the current design (colours, pattern, picture, drawing) to a canvas. */
+    async function rasterizeRangoli(size = 1024) {
+      const url = URL.createObjectURL(
+        new Blob([serializeSvg(size)], { type: "image/svg+xml;charset=utf-8" })
+      );
+      try {
+        const image = await loadImage(url);
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = size;
+        canvas.getContext("2d").drawImage(image, 0, 0, size, size);
+        return canvas;
+      } catch {
+        throw userError("Couldn’t prepare your design for AR.");
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    let ar = null; // created once, on first AR start
+
+    function createAr(THREE) {
+      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      renderer.xr.enabled = true;
+      renderer.xr.setReferenceSpaceType("local");
+      renderer.domElement.hidden = true; // AR renders to the device camera view, not the page
+      document.body.appendChild(renderer.domElement);
+
+      const maxAnisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera();
+
+      const reticle = new THREE.Mesh(
+        new THREE.RingGeometry(0.12, 0.16, 32).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ color: 0xffffff })
+      );
+      reticle.matrixAutoUpdate = false;
+      reticle.visible = false;
+      scene.add(reticle);
+
+      // One reusable mesh: tapping again just moves it (no per-tap allocation).
+      const rangoli = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.5, 0.5).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ transparent: true, side: THREE.DoubleSide })
+      );
+      rangoli.visible = false;
+      scene.add(rangoli);
+
+      const controller = renderer.xr.getController(0);
+      controller.addEventListener("select", () => {
+        if (!reticle.visible || !rangoli.material.map) {
+          setArStatus("Move your phone slowly to find a surface.");
+          return;
+        }
+        reticle.matrix.decompose(rangoli.position, rangoli.quaternion, rangoli.scale);
+        rangoli.visible = true;
+        setArStatus("Rangoli placed. Tap another spot to move it.");
+      });
+      scene.add(controller);
+
+      let hitTestSource = null;
+      let announcedSurface = false;
+
+      function onFrame(_time, xrFrame) {
+        if (!xrFrame) return;
+
+        if (hitTestSource) {
+          const hit = xrFrame.getHitTestResults(hitTestSource)[0];
+          const pose = hit?.getPose(renderer.xr.getReferenceSpace()); // can be null
+          reticle.visible = Boolean(pose);
+
+          if (pose) {
+            reticle.matrix.fromArray(pose.transform.matrix);
+            if (!announcedSurface) {
+              announcedSurface = true;
+              if (!rangoli.visible) setArStatus("Surface found. Tap to place your rangoli.");
+            }
+          }
+        }
+        renderer.render(scene, camera);
+      }
+
+      renderer.xr.addEventListener("sessionstart", async () => {
+        const session = renderer.xr.getSession();
+        announcedSurface = false;
+        renderer.setAnimationLoop(onFrame); // only runs while an AR session is active
+        setArStatus("Move your phone slowly to find a surface.");
+
+        try {
+          const viewerSpace = await session.requestReferenceSpace("viewer");
+          const source = await session.requestHitTestSource({ space: viewerSpace });
+          if (renderer.xr.getSession() === session) hitTestSource = source;
+          else source.cancel();
+        } catch {
+          setArStatus("Surface detection isn’t available on this device.");
+        }
+      });
+
+      renderer.xr.addEventListener("sessionend", () => {
+        renderer.setAnimationLoop(null);
+        hitTestSource?.cancel();
+        hitTestSource = null;
+        reticle.visible = false;
+        rangoli.visible = false;
+        rangoli.material.map?.dispose(); // free GPU memory until next time
+        rangoli.material.map = null;
+        arOverlay.style.display = "none";
+        arStart.disabled = false;
+        setArStatus("AR ended. Tap Start AR to place your design again.");
+      });
+
+      return {
+        renderer,
+        setTexture(canvas) {
+          const texture = new THREE.CanvasTexture(canvas);
+          texture.colorSpace = THREE.SRGBColorSpace;
+          texture.anisotropy = maxAnisotropy; // sharper when viewed at a low angle
+          rangoli.material.map?.dispose();
+          rangoli.material.map = texture;
+          rangoli.material.needsUpdate = true;
+        }
+      };
+    }
+
+    arStart.addEventListener("click", async () => {
+      arStart.disabled = true;
+      setArStatus("Starting AR…");
+
+      let sessionPromise;
+      let session;
+
+      try {
+        // requestSession must run straight from the tap, before any `await`.
+        sessionPromise = navigator.xr.requestSession("immersive-ar", {
+          requiredFeatures: ["hit-test"],
+          optionalFeatures: ["dom-overlay"],
+          domOverlay: { root: arOverlay }
+        });
+        sessionPromise.catch(() => {}); // surfaced below via `await`
+
+        // Load the library and render the design while the camera prompt is up.
+        const [THREE, canvas] = await Promise.all([loadThree(), rasterizeRangoli()]);
+        session = await sessionPromise;
+
+        ar ??= createAr(THREE);
+        ar.setTexture(canvas);
+        await ar.renderer.xr.setSession(session);
+        arOverlay.style.display = "flex";
+      } catch (error) {
+        console.error("AR start failed:", error);
+        (session ? Promise.resolve(session) : sessionPromise)
+          ?.then((s) => s.end())
+          .catch(() => {});
+        arOverlay.style.display = "none";
+        arStart.disabled = false;
+        setArStatus(describeArError(error));
+      }
+    });
+
+    arExit.addEventListener("beforexrselect", (event) => event.preventDefault());
+    arExit.addEventListener("click", () => ar?.renderer.xr.getSession()?.end());
+
+    async function setupAr() {
+      const problem = await detectArProblem();
+      if (problem) {
+        setArStatus(problem); // stays visible so you can see why AR is unavailable
+        return;
+      }
+
+      arStart.disabled = false;
+      setArStatus("AR is available on this device. Tap Start AR.");
+
+      // Warm up the 3D library when the browser is idle so Start AR is quick.
+      const idle = window.requestIdleCallback ?? ((callback) => setTimeout(callback, 1500));
+      idle(() => loadThree().catch(() => {}));
+    }
+
+    drawRangoli();
+    setupAr();
+  </script>
+</body>
+</html>
