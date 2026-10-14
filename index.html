@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Create Your Rangoli</title>
+  <title>AnyWhere Rangoli</title>
 
   <style>
     :root {
@@ -24,10 +24,9 @@
     }
 
     nav {
-      height: 52px;
+      min-height: 52px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
       padding: 0 7vw;
       border-bottom: 1px solid var(--line);
       background: rgba(255, 255, 255, .82);
@@ -73,9 +72,8 @@
       line-height: 1.5;
     }
 
-    /* The shadow lives on a static pseudo-element instead of a CSS filter on
-       the SVG, so drawing on the rangoli doesn't re-rasterise a blur on every
-       pointer move (a big cost on phones). */
+    /* Shadow on a static pseudo-element: no CSS filter on the SVG, so drawing
+       never forces a blur re-render. */
     .artwork {
       position: relative;
       width: min(470px, 88vw);
@@ -110,7 +108,7 @@
       gap: 12px;
     }
 
-    .controls { margin: 20px 0 26px; }
+    .controls { margin: 20px 0 14px; }
 
     button {
       border: 1px solid var(--primary);
@@ -190,7 +188,7 @@
     }
 
     .upload-card {
-      max-width: 690px;
+      max-width: 760px;
       margin: 14px auto;
       padding: 22px;
       border: 1px solid var(--line);
@@ -226,32 +224,45 @@
     .status {
       min-height: 20px;
       margin: 10px 0 0 !important;
+      color: var(--muted);
       font-size: 13px !important;
     }
 
-    /* Shown only while an AR session is running (WebXR DOM overlay). */
-    #arOverlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      z-index: 30;
-      flex-direction: column;
-      justify-content: space-between;
-      align-items: center;
-      padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
-      background: transparent;
-      pointer-events: none;
+    #downloadStatus { margin: 0 0 18px !important; }
+
+    .model-viewer-wrap {
+      overflow: hidden;
+      margin-top: 18px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: radial-gradient(ellipse at 50% 0%, #fff 0, #f5faff 80%);
     }
 
-    #arOverlay button { pointer-events: auto; }
+    model-viewer {
+      display: block;
+      width: 100%;
+      height: min(65vh, 500px);
+      min-height: 300px;
+      --poster-color: transparent;
+    }
 
-    #arHud {
-      margin: 0;
-      padding: 10px 16px;
+    /* A custom slotted AR button must position itself. model-viewer only shows
+       it on devices that can actually open AR. */
+    .ar-button {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      border: 0;
       border-radius: 999px;
-      background: rgba(0, 0, 0, .6);
+      padding: 12px 18px;
+      background: var(--primary);
       color: #fff;
+      font: inherit;
       font-size: 14px;
+    }
+
+    .bottom-actions {
+      margin: 26px auto 0;
       text-align: center;
     }
 
@@ -260,6 +271,7 @@
       border-top: 1px solid var(--line);
       color: var(--muted);
       font-size: 12px;
+      text-align: center;
     }
 
     @media (max-width: 540px) {
@@ -273,12 +285,22 @@
       button { transition: none; }
     }
   </style>
+
+  <!-- Only needed by the three.js exporters, which import "three" by name.
+       Nothing from three.js or model-viewer is downloaded until it's needed. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
 </head>
 
 <body>
   <nav aria-label="Main navigation">
-    <a class="brand" href="#">Rangoli Studio</a>
-    <a href="#design">Create</a>
+    <a class="brand" href="#">AnyWhere Rangoli</a>
   </nav>
 
   <main id="design">
@@ -286,7 +308,7 @@
     <h1>Display your<br>creativity.</h1>
     <p class="intro">
       Explore colour, pattern and symmetry. Add a picture, draw on your
-      rangoli, download your design, or place it in your space with AR.
+      rangoli, download it as a JPEG, or view it in 3D and AR.
     </p>
 
     <div class="artwork">
@@ -336,7 +358,7 @@
 
     <div class="controls">
       <button type="button" id="shuffleButton">Try a colour mix</button>
-      <button type="button" class="secondary" id="downloadButton">Download SVG</button>
+      <button type="button" class="secondary" id="downloadJpegButton">Download JPEG</button>
       <button type="button" class="secondary" id="drawToggle" aria-pressed="false">Draw on rangoli</button>
 
       <label class="control-group">
@@ -352,6 +374,7 @@
       <button type="button" class="secondary" id="undoDrawing">Undo stroke</button>
       <button type="button" class="secondary" id="clearDrawing">Clear drawing</button>
     </div>
+    <p id="downloadStatus" class="status" aria-live="polite"></p>
 
     <section class="upload-card" aria-labelledby="logoHeading">
       <h2 id="logoHeading">Drop a picture!</h2>
@@ -364,38 +387,58 @@
     </section>
 
     <section id="arCard" class="upload-card" aria-labelledby="arHeading">
-      <h2 id="arHeading">View your rangoli in AR</h2>
+      <h2 id="arHeading">View your rangoli in 3D or AR</h2>
       <p>
-        Start AR, point your phone at the floor or a table, and tap to place
-        the current rangoli design. Colour, pattern, centre picture, and
-        drawing changes are included.
+        Prepare your design, then spin it around here or place it in your
+        space: Chrome on Android opens it directly in the browser, and Safari
+        on iPhone opens it in AR Quick Look.
       </p>
       <div class="upload-row">
-        <button type="button" id="arStart" disabled>Start AR</button>
+        <button type="button" id="prepareModelButton">Prepare 3D / AR view</button>
+        <button type="button" class="secondary" id="downloadGlbButton" disabled>Download GLB</button>
+        <button type="button" class="secondary" id="downloadUsdzButton" disabled>Download USDZ</button>
       </div>
-      <p id="arStatus" class="status" aria-live="polite">Checking AR support…</p>
+      <p id="modelStatus" class="status" aria-live="polite">Your 3D model has not been prepared yet.</p>
+
+      <div id="modelViewerWrap" class="model-viewer-wrap" hidden>
+        <model-viewer
+          id="modelViewer"
+          alt="Your custom rangoli design"
+          camera-controls
+          touch-action="pan-y"
+          camera-orbit="0deg 35deg auto"
+          interaction-prompt="none"
+          environment-image="neutral"
+          exposure="1.1"
+          shadow-intensity="0"
+          ar
+          ar-modes="webxr quick-look"
+          ar-placement="floor"
+          ar-scale="auto">
+          <button slot="ar-button" class="ar-button" type="button">View in your space</button>
+        </model-viewer>
+      </div>
     </section>
+
+    <div class="bottom-actions">
+      <button type="button" id="submitButton">Submit</button>
+    </div>
   </main>
 
-  <footer>Rangoli Studio · A small creative project</footer>
+  <footer>AnyWhere Rangoli</footer>
 
-  <!-- DOM overlay: the only page UI visible while the AR camera is running -->
-  <div id="arOverlay">
-    <p id="arHud"></p>
-    <button type="button" class="secondary" id="arExit">Exit AR</button>
-  </div>
-
-  <!-- Plain script: no top-level dependency on three.js, so the editor works
-       even if the CDN is slow, blocked, or the browser lacks import maps. -->
   <script type="module">
     const $ = (selector) => document.querySelector(selector);
     const SVG_NS = "http://www.w3.org/2000/svg";
-    const VIEW = 500; // rangoli viewBox size
-    const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js";
+    const VIEW = 500;
 
-    /* ------------------------------------------------------------------ *
-     * Editor
-     * ------------------------------------------------------------------ */
+    // Set this to the page the Submit button should open.
+    const SUBMIT_URL = "";
+
+    const MODEL_VIEWER_URL =
+      "https://cdn.jsdelivr.net/npm/@google/model-viewer@4.0.0/dist/model-viewer.min.js";
+    const MODEL_SIZE_METRES = 0.6;
+
     const rangoliSvg = $("#rangoli");
     const patternGroup = $("#pattern");
     const freehandLayer = $("#freehandLayer");
@@ -408,6 +451,20 @@
     const drawWidth = $("#drawWidth");
     const logoInput = $("#logoInput");
     const logoStatus = $("#logoStatus");
+    const downloadStatus = $("#downloadStatus");
+
+    const modelStatus = $("#modelStatus");
+    const prepareModelButton = $("#prepareModelButton");
+    const downloadGlbButton = $("#downloadGlbButton");
+    const downloadUsdzButton = $("#downloadUsdzButton");
+    const modelViewer = $("#modelViewer");
+    const modelViewerWrap = $("#modelViewerWrap");
+
+    // Model state is declared up front because editor handlers refer to it.
+    let currentGlbUrl = null;
+    let currentUsdzUrl = null;
+    let currentGlbBlob = null;
+    let currentUsdzBlob = null;
 
     const PALETTES = [
       ["#e84f5b", "#f4b942", "#3478b8"],
@@ -427,7 +484,6 @@
     const INNER_PETAL = "M0 0C-18 -20 -25 -54 0 -91C25 -54 18 -20 0 0Z";
     const WHITE_STROKE = 'stroke="#fff" stroke-width="4"';
 
-    // The ring of 32 dots never changes, so compute its coordinates once.
     const DOTS = Array.from({ length: 32 }, (_, i) => {
       const angle = (i * Math.PI) / 16;
       return [(Math.cos(angle) * 199).toFixed(2), (Math.sin(angle) * 199).toFixed(2)];
@@ -450,15 +506,23 @@
       return out;
     }
 
+    /** Tell the user the 3D/AR model no longer matches the design. */
+    function markModelStale() {
+      if (!currentGlbBlob) return;
+      modelStatus.textContent =
+        "Your design changed. Tap “Update 3D / AR view” to refresh the model.";
+    }
+
     function drawRangoli() {
       const style = patternPicker.value;
       const isCanvas = style === "canvas";
 
       centerDisc.style.display = isCanvas ? "none" : "";
-      // Colour values from <input type="color"> are always #rrggbb, so this is safe.
+      // Values from <input type="color"> are always #rrggbb, so this is safe.
       patternGroup.innerHTML = isCanvas
         ? ""
         : patternMarkup(style, pickers.map((picker) => picker.value));
+      markModelStale();
     }
 
     // Colour pickers fire many `input` events per second; redraw once per frame.
@@ -481,31 +545,18 @@
       drawRangoli();
     });
 
-    /** Serialise the live SVG. Pass a size to give it a fixed pixel size (for rasterising). */
+    /* ---- Shared helpers ------------------------------------------------ */
+
     function serializeSvg(size) {
       const copy = rangoliSvg.cloneNode(true);
       copy.removeAttribute("class");
       copy.setAttribute("xmlns", SVG_NS);
       if (size) {
-        copy.setAttribute("width", size);
-        copy.setAttribute("height", size);
+        copy.setAttribute("width", String(size));
+        copy.setAttribute("height", String(size));
       }
       return new XMLSerializer().serializeToString(copy);
     }
-
-    $("#downloadButton").addEventListener("click", () => {
-      const url = URL.createObjectURL(
-        new Blob([serializeSvg()], { type: "image/svg+xml;charset=utf-8" })
-      );
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "my-rangoli.svg";
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    });
-
-    /* ---- Centre picture ------------------------------------------------ */
-    const LOGO_MAX = 384;
 
     const loadImage = (src) => new Promise((resolve, reject) => {
       const image = new Image();
@@ -516,20 +567,95 @@
       image.src = src;
     });
 
-    function setLogo(dataUrl) {
-      if (dataUrl) centerLogo.setAttribute("href", dataUrl);
-      else centerLogo.removeAttribute("href");
-      centerLogo.style.display = dataUrl ? "" : "none";
+    /** Render the live design to a square canvas (optionally on a solid background). */
+    async function rasterizeRangoli(size, background) {
+      const url = URL.createObjectURL(
+        new Blob([serializeSvg(size)], { type: "image/svg+xml;charset=utf-8" })
+      );
+
+      try {
+        const image = await loadImage(url);
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = size;
+
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Could not prepare the rangoli image.");
+
+        if (background) {
+          context.fillStyle = background;
+          context.fillRect(0, 0, size, size);
+        }
+        context.drawImage(image, 0, 0, size, size);
+        return canvas;
+      } finally {
+        URL.revokeObjectURL(url);
+      }
     }
 
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
+    /* ---- JPEG download ------------------------------------------------- */
+
     /**
-     * Decode the picture and re-encode it as a small PNG. Phone photos are
-     * several MB; embedding them raw makes the SVG huge, and big embedded
-     * images are a common reason SVG→canvas conversion (used for AR) fails
-     * on phones. Rasterising also neutralises any scripts inside uploaded SVGs.
+     * On phones the share sheet offers "Save Image", which puts the picture in
+     * the Photos/Gallery app. A plain download would land in Files instead.
+     * Laptops get a normal download.
      */
+    async function saveJpeg(blob, filename) {
+      const file = new File([blob], filename, { type: "image/jpeg" });
+      const isTouch = matchMedia("(pointer: coarse)").matches;
+
+      if (isTouch && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: "My rangoli" });
+          return "Choose “Save Image” to add it to your gallery.";
+        } catch (error) {
+          if (error.name === "AbortError") return "";
+          // Any other failure: fall through to a normal download.
+        }
+      }
+
+      downloadBlob(blob, filename);
+      return "Your JPEG is downloading.";
+    }
+
+    $("#downloadJpegButton").addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      downloadStatus.textContent = "Creating your JPEG…";
+
+      try {
+        const canvas = await rasterizeRangoli(1600, "#fffdf8");
+        const blob = await new Promise((resolve, reject) => {
+          canvas.toBlob(
+            (result) => (result ? resolve(result) : reject(new Error("Could not create a JPEG file."))),
+            "image/jpeg",
+            0.94
+          );
+        });
+        downloadStatus.textContent = await saveJpeg(blob, "my-rangoli.jpg");
+      } catch (error) {
+        downloadStatus.textContent = error.message || "Could not download the JPEG.";
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    /* ---- Centre picture ------------------------------------------------ */
+
+    const LOGO_MAX = 384;
+
+    /** Shrink and re-encode the picture; phone photos are far too large to embed raw. */
     async function fileToLogoDataUrl(file) {
       const objectUrl = URL.createObjectURL(file);
+
       try {
         const image = await loadImage(objectUrl);
         const isSvg = file.type === "image/svg+xml" || /\.svg$/i.test(file.name);
@@ -541,11 +667,23 @@
         const canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.round(width * scale));
         canvas.height = Math.max(1, Math.round(height * scale));
-        canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Could not process that picture.");
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
         return canvas.toDataURL("image/png");
       } finally {
         URL.revokeObjectURL(objectUrl);
       }
+    }
+
+    function setLogo(dataUrl) {
+      if (dataUrl) centerLogo.setAttribute("href", dataUrl);
+      else centerLogo.removeAttribute("href");
+
+      centerLogo.style.display = dataUrl ? "" : "none";
+      markModelStale();
     }
 
     logoInput.addEventListener("change", async () => {
@@ -553,6 +691,7 @@
       if (!file) return;
 
       logoStatus.textContent = "Processing picture…";
+
       try {
         setLogo(await fileToLogoDataUrl(file));
         logoStatus.textContent = "Picture added to the centre.";
@@ -568,6 +707,7 @@
     });
 
     /* ---- Freehand drawing ---------------------------------------------- */
+
     let drawingEnabled = false;
     let stroke = null;
     let strokeD = "";
@@ -584,11 +724,13 @@
       frame = 0;
       stroke.setAttribute("d", strokeD);
       stroke = null;
+      markModelStale();
     }
 
     drawToggle.addEventListener("click", () => {
       drawingEnabled = !drawingEnabled;
       if (!drawingEnabled) endStroke();
+
       drawToggle.setAttribute("aria-pressed", String(drawingEnabled));
       drawToggle.textContent = drawingEnabled ? "Finish drawing" : "Draw on rangoli";
       rangoliSvg.classList.toggle("is-drawing", drawingEnabled);
@@ -599,10 +741,10 @@
 
       event.preventDefault();
       rangoliSvg.setPointerCapture(event.pointerId);
-      box = rangoliSvg.getBoundingClientRect(); // measured once per stroke, not per move
+      box = rangoliSvg.getBoundingClientRect(); // measured once per stroke
 
       const start = pointFrom(event);
-      strokeD = `M${start}L${start}`; // zero-length segment so a single tap leaves a dot
+      strokeD = `M${start} L${start}`; // zero-length segment so a tap leaves a dot
 
       stroke = document.createElementNS(SVG_NS, "path");
       stroke.setAttribute("d", strokeD);
@@ -615,7 +757,7 @@
       if (!stroke) return;
 
       for (const sample of event.getCoalescedEvents?.() ?? [event]) {
-        strokeD += `L${pointFrom(sample)}`;
+        strokeD += ` L${pointFrom(sample)}`;
       }
       // Touch the DOM at most once per frame.
       frame ||= requestAnimationFrame(() => {
@@ -627,244 +769,175 @@
     rangoliSvg.addEventListener("pointerup", endStroke);
     rangoliSvg.addEventListener("pointercancel", endStroke);
 
-    $("#undoDrawing").addEventListener("click", () => freehandLayer.lastElementChild?.remove());
-    $("#clearDrawing").addEventListener("click", () => freehandLayer.replaceChildren());
+    $("#undoDrawing").addEventListener("click", () => {
+      freehandLayer.lastElementChild?.remove();
+      markModelStale();
+    });
 
-    /* ------------------------------------------------------------------ *
-     * AR (WebXR). three.js is only downloaded, and a WebGL context only
-     * created, on devices that actually support immersive AR.
-     * ------------------------------------------------------------------ */
-    const arStart = $("#arStart");
-    const arStatus = $("#arStatus");
-    const arOverlay = $("#arOverlay");
-    const arHud = $("#arHud");
-    const arExit = $("#arExit");
+    $("#clearDrawing").addEventListener("click", () => {
+      freehandLayer.replaceChildren();
+      markModelStale();
+    });
 
-    const setArStatus = (message) => {
-      arStatus.textContent = message;
-      arHud.textContent = message;
-    };
-
-    const userError = (message) => Object.assign(new Error(message), { userMessage: message });
+    /* ---- Lazy-loaded libraries ----------------------------------------- */
 
     let threePromise = null;
-    const loadThree = () => (threePromise ??= import(THREE_URL).catch(() => {
+    const loadThree = () => (threePromise ??= Promise.all([
+      import("three"),
+      import("three/addons/exporters/GLTFExporter.js"),
+      import("three/addons/exporters/USDZExporter.js")
+    ]).catch((error) => {
       threePromise = null; // allow a retry
-      throw userError("Couldn’t load the 3D library. Check your connection and try again.");
+      throw error;
     }));
 
-    /** Returns a human-readable reason AR can't run here, or null if it can. */
-    async function detectArProblem() {
-      if (!window.isSecureContext) {
-        return "AR needs a secure page (https://). This page was opened over plain http or a local file, " +
-               "so the browser blocks AR. Host it on HTTPS (e.g. GitHub Pages, Netlify) or open it via localhost.";
-      }
-      if (!navigator.xr) {
-        return "This browser doesn’t support WebXR AR. On Android use Chrome; " +
-               "Safari on iPhone/iPad doesn’t support WebXR.";
-      }
-      try {
-        if (!(await navigator.xr.isSessionSupported("immersive-ar"))) {
-          return "This device or browser doesn’t offer AR. On Android, use Chrome and make sure " +
-                 "“Google Play Services for AR” is installed and up to date.";
-        }
-      } catch {
-        return "Couldn’t check AR support in this browser.";
-      }
-      return null;
+    let viewerPromise = null;
+    const loadModelViewer = () => (viewerPromise ??= import(MODEL_VIEWER_URL).catch((error) => {
+      viewerPromise = null;
+      throw error;
+    }));
+
+    // Start fetching both libraries shortly before the 3D/AR card scrolls into
+    // view, so "Prepare" feels instant without slowing the initial page load.
+    let warmedUp = false;
+    function warmUp() {
+      if (warmedUp || navigator.connection?.saveData) return;
+      warmedUp = true;
+      loadThree().catch(() => { warmedUp = false; });
+      loadModelViewer().catch(() => {});
     }
 
-    function describeArError(error) {
-      if (error?.userMessage) return error.userMessage;
-      switch (error?.name) {
-        case "NotAllowedError":
-        case "SecurityError":
-          return "AR was blocked. Allow camera access for this site, then tap Start AR again.";
-        case "NotSupportedError":
-          return "This device can’t start AR with the features needed (surface detection).";
-        default:
-          return "Couldn’t start AR on this device.";
+    new IntersectionObserver((entries, observer) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        warmUp();
+        observer.disconnect();
       }
-    }
+    }, { rootMargin: "600px" }).observe($("#arCard"));
 
-    /** Render the current design (colours, pattern, picture, drawing) to a canvas. */
-    async function rasterizeRangoli(size = 1024) {
-      const url = URL.createObjectURL(
-        new Blob([serializeSvg(size)], { type: "image/svg+xml;charset=utf-8" })
-      );
-      try {
-        const image = await loadImage(url);
-        const canvas = document.createElement("canvas");
-        canvas.width = canvas.height = size;
-        canvas.getContext("2d").drawImage(image, 0, 0, size, size);
-        return canvas;
-      } catch {
-        throw userError("Couldn’t prepare your design for AR.");
-      } finally {
-        URL.revokeObjectURL(url);
-      }
-    }
+    /* ---- GLB / USDZ generation ----------------------------------------- */
 
-    let ar = null; // created once, on first AR start
+    /**
+     * The USDZ exporter writes lit PBR materials, so both formats use
+     * MeshStandardMaterial. (MeshBasicMaterial produces invalid USDZ values.)
+     * USDZ doesn't support double-sided materials, so it gets a front-side
+     * plane; the GLB viewer gets a double-sided one so it's visible from below.
+     */
+    function buildScene(THREE, texture, side) {
+      const geometry = new THREE.PlaneGeometry(MODEL_SIZE_METRES, MODEL_SIZE_METRES);
+      geometry.rotateX(-Math.PI / 2); // lie flat, facing up
 
-    function createAr(THREE) {
-      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-      renderer.xr.enabled = true;
-      renderer.xr.setReferenceSpaceType("local");
-      renderer.domElement.hidden = true; // AR renders to the device camera view, not the page
-      document.body.appendChild(renderer.domElement);
+      const material = new THREE.MeshStandardMaterial({
+        map: texture,
+        transparent: true,
+        roughness: 1,
+        metalness: 0,
+        side
+      });
 
-      const maxAnisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera();
+      scene.add(new THREE.Mesh(geometry, material));
 
-      const reticle = new THREE.Mesh(
-        new THREE.RingGeometry(0.12, 0.16, 32).rotateX(-Math.PI / 2),
-        new THREE.MeshBasicMaterial({ color: 0xffffff })
-      );
-      reticle.matrixAutoUpdate = false;
-      reticle.visible = false;
-      scene.add(reticle);
-
-      // One reusable mesh: tapping again just moves it (no per-tap allocation).
-      const rangoli = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.5, 0.5).rotateX(-Math.PI / 2),
-        new THREE.MeshBasicMaterial({ transparent: true, side: THREE.DoubleSide })
-      );
-      rangoli.visible = false;
-      scene.add(rangoli);
-
-      const controller = renderer.xr.getController(0);
-      controller.addEventListener("select", () => {
-        if (!reticle.visible || !rangoli.material.map) {
-          setArStatus("Move your phone slowly to find a surface.");
-          return;
-        }
-        reticle.matrix.decompose(rangoli.position, rangoli.quaternion, rangoli.scale);
-        rangoli.visible = true;
-        setArStatus("Rangoli placed. Tap another spot to move it.");
-      });
-      scene.add(controller);
-
-      let hitTestSource = null;
-      let announcedSurface = false;
-
-      function onFrame(_time, xrFrame) {
-        if (!xrFrame) return;
-
-        if (hitTestSource) {
-          const hit = xrFrame.getHitTestResults(hitTestSource)[0];
-          const pose = hit?.getPose(renderer.xr.getReferenceSpace()); // can be null
-          reticle.visible = Boolean(pose);
-
-          if (pose) {
-            reticle.matrix.fromArray(pose.transform.matrix);
-            if (!announcedSurface) {
-              announcedSurface = true;
-              if (!rangoli.visible) setArStatus("Surface found. Tap to place your rangoli.");
-            }
-          }
-        }
-        renderer.render(scene, camera);
-      }
-
-      renderer.xr.addEventListener("sessionstart", async () => {
-        const session = renderer.xr.getSession();
-        announcedSurface = false;
-        renderer.setAnimationLoop(onFrame); // only runs while an AR session is active
-        setArStatus("Move your phone slowly to find a surface.");
-
-        try {
-          const viewerSpace = await session.requestReferenceSpace("viewer");
-          const source = await session.requestHitTestSource({ space: viewerSpace });
-          if (renderer.xr.getSession() === session) hitTestSource = source;
-          else source.cancel();
-        } catch {
-          setArStatus("Surface detection isn’t available on this device.");
-        }
-      });
-
-      renderer.xr.addEventListener("sessionend", () => {
-        renderer.setAnimationLoop(null);
-        hitTestSource?.cancel();
-        hitTestSource = null;
-        reticle.visible = false;
-        rangoli.visible = false;
-        rangoli.material.map?.dispose(); // free GPU memory until next time
-        rangoli.material.map = null;
-        arOverlay.style.display = "none";
-        arStart.disabled = false;
-        setArStatus("AR ended. Tap Start AR to place your design again.");
-      });
-
-      return {
-        renderer,
-        setTexture(canvas) {
-          const texture = new THREE.CanvasTexture(canvas);
-          texture.colorSpace = THREE.SRGBColorSpace;
-          texture.anisotropy = maxAnisotropy; // sharper when viewed at a low angle
-          rangoli.material.map?.dispose();
-          rangoli.material.map = texture;
-          rangoli.material.needsUpdate = true;
-        }
-      };
+      return { scene, dispose: () => { geometry.dispose(); material.dispose(); } };
     }
 
-    arStart.addEventListener("click", async () => {
-      arStart.disabled = true;
-      setArStatus("Starting AR…");
+    async function exportUsdz(scene, USDZExporter) {
+      const exporter = new USDZExporter();
+      // Newer three.js releases made parse() async; older ones used parseAsync().
+      const run = exporter.parseAsync ?? exporter.parse;
+      return run.call(exporter, scene, { quickLookCompatible: true, maxTextureSize: 1024 });
+    }
 
-      let sessionPromise;
-      let session;
+    function showModel(glbBlob, usdzBlob) {
+      const nextGlbUrl = URL.createObjectURL(glbBlob);
+      const nextUsdzUrl = URL.createObjectURL(usdzBlob);
+
+      modelViewerWrap.hidden = false;
+      modelViewer.setAttribute("src", nextGlbUrl);
+      modelViewer.setAttribute("ios-src", nextUsdzUrl);
+
+      if (currentGlbUrl) URL.revokeObjectURL(currentGlbUrl);
+      if (currentUsdzUrl) URL.revokeObjectURL(currentUsdzUrl);
+
+      currentGlbUrl = nextGlbUrl;
+      currentUsdzUrl = nextUsdzUrl;
+      currentGlbBlob = glbBlob;
+      currentUsdzBlob = usdzBlob;
+
+      downloadGlbButton.disabled = false;
+      downloadUsdzButton.disabled = false;
+      prepareModelButton.textContent = "Update 3D / AR view";
+    }
+
+    prepareModelButton.addEventListener("click", async () => {
+      prepareModelButton.disabled = true;
+      modelStatus.textContent = "Creating your 3D model…";
+
+      let glbScene;
+      let usdzScene;
+      let texture;
 
       try {
-        // requestSession must run straight from the tap, before any `await`.
-        sessionPromise = navigator.xr.requestSession("immersive-ar", {
-          requiredFeatures: ["hit-test"],
-          optionalFeatures: ["dom-overlay"],
-          domOverlay: { root: arOverlay }
-        });
-        sessionPromise.catch(() => {}); // surfaced below via `await`
+        const [canvas, [THREE, { GLTFExporter }, { USDZExporter }]] = await Promise.all([
+          rasterizeRangoli(1024),
+          loadThree(),
+          loadModelViewer()
+        ]);
 
-        // Load the library and render the design while the camera prompt is up.
-        const [THREE, canvas] = await Promise.all([loadThree(), rasterizeRangoli()]);
-        session = await sessionPromise;
+        texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
 
-        ar ??= createAr(THREE);
-        ar.setTexture(canvas);
-        await ar.renderer.xr.setSession(session);
-        arOverlay.style.display = "flex";
+        glbScene = buildScene(THREE, texture, THREE.DoubleSide);
+        usdzScene = buildScene(THREE, texture, THREE.FrontSide);
+
+        const [glbBuffer, usdzBuffer] = await Promise.all([
+          new GLTFExporter().parseAsync(glbScene.scene, { binary: true, onlyVisible: true }),
+          exportUsdz(usdzScene.scene, USDZExporter)
+        ]);
+
+        showModel(
+          new Blob([glbBuffer], { type: "model/gltf-binary" }),
+          new Blob([usdzBuffer], { type: "model/vnd.usdz+zip" })
+        );
+
+        modelStatus.textContent =
+          "3D model ready. Drag to rotate it, or use “View in your space” on a supported phone.";
+
+        // model-viewer works out AR availability just after the model loads.
+        modelViewer.addEventListener("load", () => {
+          setTimeout(() => {
+            if (!modelViewer.canActivateAR) {
+              modelStatus.textContent =
+                "3D model ready. To place it in your space, open this page on an iPhone (Safari) or an Android phone (Chrome).";
+            }
+          }, 400);
+        }, { once: true });
       } catch (error) {
-        console.error("AR start failed:", error);
-        (session ? Promise.resolve(session) : sessionPromise)
-          ?.then((s) => s.end())
-          .catch(() => {});
-        arOverlay.style.display = "none";
-        arStart.disabled = false;
-        setArStatus(describeArError(error));
+        console.error("Model generation failed:", error);
+        modelStatus.textContent =
+          "Could not create the 3D model. Check your connection and try again.";
+      } finally {
+        glbScene?.dispose();
+        usdzScene?.dispose();
+        texture?.dispose();
+        prepareModelButton.disabled = false;
       }
     });
 
-    arExit.addEventListener("beforexrselect", (event) => event.preventDefault());
-    arExit.addEventListener("click", () => ar?.renderer.xr.getSession()?.end());
+    downloadGlbButton.addEventListener("click", () => {
+      if (currentGlbBlob) downloadBlob(currentGlbBlob, "my-rangoli.glb");
+    });
 
-    async function setupAr() {
-      const problem = await detectArProblem();
-      if (problem) {
-        setArStatus(problem); // stays visible so you can see why AR is unavailable
-        return;
-      }
+    downloadUsdzButton.addEventListener("click", () => {
+      if (currentUsdzBlob) downloadBlob(currentUsdzBlob, "my-rangoli.usdz");
+    });
 
-      arStart.disabled = false;
-      setArStatus("AR is available on this device. Tap Start AR.");
+    /* ---- Submit -------------------------------------------------------- */
 
-      // Warm up the 3D library when the browser is idle so Start AR is quick.
-      const idle = window.requestIdleCallback ?? ((callback) => setTimeout(callback, 1500));
-      idle(() => loadThree().catch(() => {}));
-    }
+    $("#submitButton").addEventListener("click", () => {
+      if (SUBMIT_URL) window.location.href = SUBMIT_URL;
+    });
 
     drawRangoli();
-    setupAr();
   </script>
 </body>
 </html>
